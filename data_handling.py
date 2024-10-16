@@ -1,6 +1,8 @@
 import torch
+import numpy as np
 import torchvision.transforms.v2 as v2
-from constants import RNG
+
+from constants import RANDOM_SEED
 
 
 def identity(X):
@@ -44,12 +46,15 @@ class DataHandler:
         use_color_aug=False,
         batch_aug=True,
         preallocate=False,
+        seed=RANDOM_SEED,
     ) -> None:
         self.batch_size = batch_size
         self.use_geo_aug = use_geo_aug
         self.use_crop_aug = use_crop_aug
         self.use_color_aug = use_color_aug
         self.batch_aug = batch_aug
+        self.seed = seed
+        self.reset()
 
         self.dataA = (
             torch.permute(torch.FloatTensor(dataA) / 127.5 - 1, (0, 3, 1, 2))
@@ -69,6 +74,9 @@ class DataHandler:
         self.N_A = len(self.dataA)
         self.N_B = len(self.dataB)
 
+    def reset(self):
+        self.rng = np.random.default_rng(self.seed)
+
     def make_sample(
         self,
         sample_size,
@@ -84,7 +92,7 @@ class DataHandler:
         if use_color_aug is None:
             use_color_aug = self.use_color_aug
 
-        idx = RNG.choice(self.N_A if use_A else self.N_B, sample_size, False)
+        idx = self.rng.choice(self.N_A if use_A else self.N_B, sample_size, False)
 
         return self.apply_augments(
             self.dataA[idx] if use_A else self.dataB[idx],
@@ -145,8 +153,8 @@ class DataHandler:
 
         half_size = max(1, batch_size // 2)
 
-        idxA = RNG.choice(self.N_A, half_size, False)
-        idxB = RNG.choice(self.N_B, half_size, False)
+        idxA = self.rng.choice(self.N_A, half_size, False)
+        idxB = self.rng.choice(self.N_B, half_size, False)
         data = torch.cat([self.dataA[idxA], self.dataB[idxB]]).cuda()
 
         labels = (
@@ -161,7 +169,8 @@ class DataHandler:
 
 
 if __name__ == "__main__":
-    dataA = RNG.normal(size=(20, 600, 600, 3))
+    rng = np.random.default_rng(0)
+    dataA = rng.normal(size=(20, 600, 600, 3))
 
     DH = DataHandler(dataA, dataA)
 

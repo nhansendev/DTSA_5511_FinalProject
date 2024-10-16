@@ -1,5 +1,4 @@
 import os
-import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
@@ -38,6 +37,7 @@ class Trainer:
         inst_norm=True,
         base_channels=16,
         show_summary=False,
+        bce_loss=True,
     ) -> None:
         self.train_dataset = train_dataset
         self.valid_data = valid_data
@@ -55,12 +55,18 @@ class Trainer:
         ).cuda()
 
         if show_summary:
+            # For lazy init
+            self.classifier(torch.ones(1, 3, 600, 600).cuda())
             summary(self.classifier, torch.ones(1, 3, 600, 600), depth=2)
 
         self.optim = torch.optim.Adam(
             self.classifier.parameters(), lr, betas=betas, eps=eps
         )
-        self.loss_fn = nn.BCEWithLogitsLoss().cuda()
+
+        if bce_loss:
+            self.loss_fn = nn.BCEWithLogitsLoss().cuda()
+        else:
+            self.loss_fn = nn.MSELoss().cuda()
 
         self.loss_hist = []
         self.valid_hist = []
@@ -68,14 +74,18 @@ class Trainer:
         self.best_score = None
         self.best_params = None
 
-    def save_model(self):
+    def save_model(self, best_params=False):
+        if best_params:
+            self.classifier.load_state_dict(self.best_params)
         torch.save(
             {"class": self.classifier.state_dict(), "optim": self.optim.state_dict()},
             os.path.join(SCRIPT_DIR, "checkpoint.pt"),
         )
 
     def load_model(self):
-        checkpoint = torch.load(os.path.join(SCRIPT_DIR, "checkpoint.pt"))
+        checkpoint = torch.load(
+            os.path.join(SCRIPT_DIR, "checkpoint.pt"), weights_only=True
+        )
         self.classifier.load_state_dict(checkpoint["class"])
         self.optim.load_state_dict(checkpoint["optim"])
 
@@ -124,7 +134,7 @@ class Trainer:
 
         with torch.autocast(device_type="cuda"):
             pred = self.classifier(data)
-        loss = self.loss_fn(pred, labels)
+            loss = self.loss_fn(pred, labels)
 
         self.loss_hist.append(loss.item())
 

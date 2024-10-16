@@ -136,20 +136,24 @@ class Classifier(nn.Module):
                 base_channels * 2 ** (i + 1),
                 1,
                 kernel=kernel_size,
-                stride=1,
+                stride=kernel_size,
                 inst_norm=inst_norm,
             )
         )
-        self.net.append(nn.AdaptiveAvgPool2d(3))
         self.net.append(nn.Flatten())
-        self.net.append(nn.Linear(9, classes))
+        self.net.append(nn.LazyLinear(classes))
 
     def forward(self, X):
         return self.net(X)
 
 
 if __name__ == "__main__":
-    model = Classifier(base_channels=16, depth=3, res_layers=2, kernel_size=5)
-    summary(model, torch.ones(1, 3, 600, 600), device="cpu", depth=8)
+    model = Classifier(base_channels=16, depth=3, res_layers=2, kernel_size=6)
+    # summary(model, torch.ones(1, 3, 600, 600), device="cpu", depth=8)
 
-    print(model(torch.ones(4, 3, 600, 600)))
+    # print(model(torch.ones(4, 3, 600, 600)))
+
+    from utils import plot_features
+
+    input = torch.ones(1, 3, 600, 600)
+    plot_features(model.net, input, "5", 5)
